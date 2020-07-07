@@ -6519,7 +6519,15 @@ acl_get_file (const char *fname, acl_type_t type)
 	      if (!get_file_security (fname, si, psd, sd_len, &sd_len))
 		{
 		  xfree (psd);
-		  errno = EIO;
+		  err = GetLastError ();
+		  if (err == ERROR_NOT_SUPPORTED)
+		    errno = ENOTSUP;
+		  else if (err == ERROR_FILE_NOT_FOUND
+			   || err == ERROR_PATH_NOT_FOUND
+			   || err == ERROR_INVALID_NAME)
+		    errno = ENOENT;
+		  else
+		    errno = EIO;
 		  psd = NULL;
 		}
 	    }
@@ -6530,6 +6538,8 @@ acl_get_file (const char *fname, acl_type_t type)
 		      be encoded in the current ANSI codepage. */
 		   || err == ERROR_INVALID_NAME)
 	    errno = ENOENT;
+	  else if (err == ERROR_NOT_SUPPORTED)
+	    errno = ENOTSUP;
 	  else
 	    errno = EIO;
 	}
@@ -10586,6 +10596,10 @@ globals_of_w32 (void)
 #endif
 
   w32_crypto_hprov = (HCRYPTPROV)0;
+
+  /* We need to forget about libraries that were loaded during the
+     dumping process (e.g. libgccjit) */
+  Vlibrary_cache = Qnil;
 }
 
 /* For make-serial-process  */

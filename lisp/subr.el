@@ -233,6 +233,11 @@ value of last one, or nil if there are none.
   (declare (indent 1) (debug t))
   (cons 'if (cons cond (cons nil body))))
 
+(defsubst subr-primitive-p (object)
+  "Return t if OBJECT is a built-in primitive function."
+  (and (subrp object)
+       (not (subr-native-elisp-p object))))
+
 (defsubst xor (cond1 cond2)
   "Return the boolean exclusive-or of COND1 and COND2.
 If only one of the arguments is non-nil, return it; otherwise
@@ -4112,7 +4117,11 @@ MODES is as for `set-default-file-modes'."
 ;; now, but it generates slower code.
 (defmacro save-match-data (&rest body)
   "Execute the BODY forms, restoring the global value of the match data.
-The value returned is the value of the last form in BODY."
+The value returned is the value of the last form in BODY.
+NOTE: The convention in Elisp is that any function, except for a few
+exceptions like car/assoc/+/goto-char, can clobber the match data,
+so `save-match-data' should normally be used to save *your* match data
+rather than your caller's match data."
   ;; It is better not to use backquote here,
   ;; because that makes a bootstrapping problem
   ;; if you need to recompile all the Lisp files using interpreted code.
@@ -4600,10 +4609,10 @@ This function makes or adds to an entry on `after-load-alist'."
                ;; So add an indirection to make sure that `func' is really run
                ;; "after-load" in case the provide call happens early.
                (lambda ()
-                 (if (not load-file-name)
+                 (if (not load-true-file-name)
                      ;; Not being provided from a file, run func right now.
                      (funcall func)
-                   (let ((lfn load-file-name)
+                   (let ((lfn load-true-file-name)
                          ;; Don't use letrec, because equal (in
                          ;; add/remove-hook) would get trapped in a cycle.
                          (fun (make-symbol "eval-after-load-helper")))
@@ -5126,7 +5135,7 @@ command is called from a keyboard macro?"
       ;; Now `frame' should be "the function from which we were called".
       (pcase (cons frame nextframe)
         ;; No subr calls `interactive-p', so we can rule that out.
-        (`((,_ ,(pred (lambda (f) (subrp (indirect-function f)))) . ,_) . ,_) nil)
+        (`((,_ ,(pred (lambda (f) (subr-primitive-p (indirect-function f)))) . ,_) . ,_) nil)
         ;; In case #<subr funcall-interactively> without going through the
         ;; `funcall-interactively' symbol (bug#3984).
         (`(,_ . (t ,(pred (lambda (f)

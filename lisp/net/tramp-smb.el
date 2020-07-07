@@ -146,6 +146,7 @@ this variable (\"client min protocol=NT1\") ."
 	 "NT_STATUS_HOST_UNREACHABLE"
 	 "NT_STATUS_IMAGE_ALREADY_LOADED"
 	 "NT_STATUS_INVALID_LEVEL"
+	 "NT_STATUS_INVALID_PARAMETER"
 	 "NT_STATUS_INVALID_PARAMETER_MIX"
 	 "NT_STATUS_IO_TIMEOUT"
 	 "NT_STATUS_LOGON_FAILURE"
@@ -292,6 +293,8 @@ See `tramp-actions-before-shell' for more info.")
     (start-file-process . tramp-smb-handle-start-file-process)
     (substitute-in-file-name . tramp-smb-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-get-remote-gid . ignore)
+    (tramp-get-remote-uid . ignore)
     (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
@@ -435,11 +438,7 @@ pass to the OPERATION."
 	  (cond
 	   ;; We must use a local temporary directory.
 	   ((and t1 t2)
-	    (let ((tmpdir
-		   (make-temp-name
-		    (expand-file-name
-		     tramp-temp-name-prefix
-		     (tramp-compat-temporary-file-directory)))))
+	    (let ((tmpdir (tramp-compat-make-temp-name)))
 	      (unwind-protect
 		  (progn
 		    (make-directory tmpdir)
@@ -467,10 +466,7 @@ pass to the OPERATION."
 		   (localname (file-name-as-directory
 			       (replace-regexp-in-string
 				"\\\\" "/" (tramp-smb-get-localname v))))
-		   (tmpdir    (make-temp-name
-			       (expand-file-name
-				tramp-temp-name-prefix
-				(tramp-compat-temporary-file-directory))))
+		   (tmpdir    (tramp-compat-make-temp-name))
 		   (args      (list (concat "//" host "/" share) "-E"))
 		   (options   tramp-smb-options))
 
@@ -708,11 +704,11 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (delete nil
 		    (mapcar (lambda (x) (when (string-match-p match x) x))
 			    result))))
-    ;; Append directory.
+    ;; Prepend directory.
     (when full
       (setq result
 	    (mapcar
-	     (lambda (x) (format "%s/%s" directory x))
+	     (lambda (x) (format "%s/%s" (directory-file-name directory) x))
 	     result)))
     ;; Sort them if necessary.
     (unless nosort (setq result (sort result #'string-lessp)))
